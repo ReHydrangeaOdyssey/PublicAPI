@@ -1,0 +1,580 @@
+syntax = "proto3";
+
+package game.model;
+
+// 列挙型と論理型の定義: design/shared/types.md
+
+enum ArenaMode {
+  ARENA_MODE_RANDOM = 0; // 全プレイヤー候補からランダムに対戦相手を選ぶモード.
+  ARENA_MODE_FRIEND = 1; // 指定したプレイヤーと対戦するモード.
+}
+
+enum ArenaBattleErrorCode {
+  ARENA_BATTLE_ERROR_NO_OPPONENT_AVAILABLE = 0; // ランダム対戦で対戦可能な相手プレイヤーが存在しない.
+  ARENA_BATTLE_ERROR_PLAYER_NOT_FOUND = 1; // フレンド対戦で指定したPlayerIDが存在しない.
+  ARENA_BATTLE_ERROR_ARENA_PARTY_NOT_REGISTERED = 2; // フレンド対戦で指定したOpponentIDは存在するがArenaPartyが未登録である.
+  ARENA_BATTLE_ERROR_REQUESTER_ARENA_PARTY_NOT_REGISTERED = 3; // 対戦要求元PlayerIDのArenaPartyが未登録である.
+  ARENA_BATTLE_ERROR_NOT_FRIENDS = 4; // Friend Arenaで双方が現在フレンドではない.
+}
+
+enum SkillEffectID {
+  SKILL_EFFECT_BUFF = 0; // 対象へバフを付与する.
+  SKILL_EFFECT_DEBUFF = 1; // 対象へデバフを付与する.
+  SKILL_EFFECT_STATUS_ABNORMALITY = 2; // 対象へ状態異常を付与する.
+  SKILL_EFFECT_HEAL = 3; // 対象のHPを割合回復する.
+  SKILL_EFFECT_ATTACK = 4; // 対象へ攻撃ダメージを与える.
+}
+
+enum SkillDamageValueType {
+  SKILL_DAMAGE_VALUE_TYPE_RATE = 0; // correction_valueを攻撃力へ乗算する割合ダメージ.
+  SKILL_DAMAGE_VALUE_TYPE_FIXED = 1; // correction_valueを固定ダメージ値として使用する.
+}
+
+enum SkillTargetSide {
+  SKILL_TARGET_SIDE_ALLY = 0; // 味方パーティを対象候補とする.
+  SKILL_TARGET_SIDE_ENEMY = 1; // 敵パーティを対象候補とする.
+  SKILL_TARGET_SIDE_SELF = 2; // 発動キャラクター自身だけを対象候補とする.
+}
+
+enum StatusAbnormalityID {
+  STATUS_ABNORMALITY_POISON = 0; // 毒.
+  STATUS_ABNORMALITY_BLINDNESS = 1; // 暗闇.
+  STATUS_ABNORMALITY_SILENCE = 2; // 沈黙.
+  STATUS_ABNORMALITY_RANGE_ATTACK_DISABLED = 3; // 範囲攻撃不可.
+  STATUS_ABNORMALITY_COMA = 4; // 昏睡.
+}
+
+enum SkillTargetRange {
+  SKILL_TARGET_RANGE_ALL = 0; // 対象全体を選択する.
+  SKILL_TARGET_RANGE_SINGLE = 1; // 単体を選択する.
+  SKILL_TARGET_RANGE_RANDOM = 2; // ランダム対象へ複数回攻撃する.
+  SKILL_TARGET_RANGE_VERTICAL_COLUMN = 3; // 縦1列を選択する.
+  SKILL_TARGET_RANGE_HORIZONTAL_ROW = 4; // 横1列を選択する.
+  SKILL_TARGET_RANGE_X_SHAPE = 5; // X字範囲を選択する.
+  SKILL_TARGET_RANGE_CROSS_SHAPE = 6; // 十字範囲を選択する.
+}
+
+enum SkillTargetConditionID {
+  SKILL_TARGET_CONDITION_NONE = 0; // 優先条件なし.
+  SKILL_TARGET_CONDITION_BUFFED = 1; // バフ状態の対象を優先する.
+  SKILL_TARGET_CONDITION_DEBUFFED = 2; // デバフ状態の対象を優先する.
+  SKILL_TARGET_CONDITION_HP_25_PERCENT_OR_BELOW = 3; // 現在HPが最大HPの25%以下の対象を優先する.
+  SKILL_TARGET_CONDITION_STATUS_ABNORMALITY = 4; // 指定した状態異常に該当する対象を優先する.
+}
+
+enum SkillStatTarget {
+  SKILL_STAT_TARGET_NONE = 0; // 能力補正対象なし.
+  SKILL_STAT_TARGET_ATTACK = 1; // 攻撃力を補正する.
+  SKILL_STAT_TARGET_DEFENSE = 2; // 防御力を補正する.
+  SKILL_STAT_TARGET_ATTACK_DEFENSE = 3; // 攻撃力と防御力を同時に補正する。同じ効果段階の補正値を両方へ適用する。
+}
+
+enum AbilityAvoidanceType {
+  ABILITY_AVOIDANCE_TYPE_NORMAL_ATTACK = 0; // 通常攻撃を回避する.
+  ABILITY_AVOIDANCE_TYPE_STATUS_ABNORMALITY = 1; // 指定状態異常を回避する.
+}
+
+enum AbilityEffectID {
+  ABILITY_EFFECT_BUFF = 0; // バフ効果.
+  ABILITY_EFFECT_DEBUFF = 1; // デバフ効果.
+  ABILITY_EFFECT_AVOIDANCE = 2; // 回避効果.
+  ABILITY_EFFECT_COUNTER = 3; // 反撃効果.
+  ABILITY_EFFECT_AVOIDANCE_DISABLE = 4; // 相手の回避を無効化する効果.
+  ABILITY_EFFECT_COUNTER_DISABLE = 5; // 相手の反撃を無効化する効果.
+  ABILITY_EFFECT_STATUS_ABNORMALITY_ATTACK = 6; // 状態異常を伴う攻撃効果.
+  ABILITY_EFFECT_DAMAGE_INCREASE = 7; // ダメージを割合増加させる効果.
+  ABILITY_EFFECT_FIXED_DAMAGE_INCREASE = 8; // ダメージを固定値で増加させる効果.
+  ABILITY_EFFECT_HEAL = 9; // 回復効果.
+  ABILITY_EFFECT_COVER = 10; // かばう効果.
+  ABILITY_EFFECT_DRAW_AGGRO = 11; // ひきつけ効果.
+  ABILITY_EFFECT_PURSUIT = 12; // 追撃効果.
+  ABILITY_EFFECT_DEFENSE_IGNORE = 13; // 通常攻撃時に対象防御力を無視する.
+  ABILITY_EFFECT_TARGET_HP_LOW_PRIORITY = 14; // 通常攻撃でピンチ状態の敵を優先対象とする.
+  ABILITY_EFFECT_TARGET_DEFENSE_DOWN_PRIORITY = 15; // 通常攻撃で防御力DOWN状態の敵を優先対象とする.
+  ABILITY_EFFECT_DRAW_AGGRO_IGNORE = 16; // 通常攻撃時に敵のひきつけ効果を無視する.
+  ABILITY_EFFECT_AVOIDANCE_COUNTER = 17; // 同一被攻撃イベントで回避と反撃の両方を扱う.
+  ABILITY_EFFECT_SURVIVE_AT_ONE_HP = 18; // 戦闘不能になるダメージを受ける場合にHP1で耐える.
+  ABILITY_EFFECT_INCAPACITATED_ALLY_COUNT_STAT_CORRECTION = 19; // 戦闘不能の味方人数に応じて自身の攻撃力/防御力を補正する.
+  ABILITY_EFFECT_CASTLE_BREAK_DAMAGE_INCREASE = 20; // 騎士団戦のキャッスルブレイクダメージを倍率増加させる.
+}
+
+enum TacticsEffectID {
+  TACTICS_EFFECT_ATTACK_CORRECTION = 0; // 攻撃力補正.
+  TACTICS_EFFECT_DEFENSE_CORRECTION = 1; // 防御力補正.
+  TACTICS_EFFECT_SPEED_CORRECTION = 2; // 速度補正.
+  TACTICS_EFFECT_SCORE_CORRECTION = 3; // スコア補正.
+  TACTICS_EFFECT_CASTLE_DEFENSE_CORRECTION = 4; // 城防御補正. 効果値はTACTICS_EFFECT_BATTLE_SPECIAL.parameters.castle_levelを参照する.
+  TACTICS_EFFECT_SCORE_LIMIT_CORRECTION = 5; // スコア上限補正.
+  TACTICS_EFFECT_MAX_TP_CORRECTION = 6; // 最大TP補正.
+  TACTICS_EFFECT_BP_RECOVERY = 7; // BP回復.
+  TACTICS_EFFECT_HP_RECOVERY = 8; // HP回復.
+  TACTICS_EFFECT_ASSAULT_CASTLE_BREAK_RATE_CORRECTION = 9; // 強襲キャッスルブレイク率補正.
+  TACTICS_EFFECT_BATTLE_SPECIAL = 10; // 戦闘時特殊効果.
+  TACTICS_EFFECT_OPPONENT_SORTIE_SELECTION_RATE_CORRECTION = 11; // 相手出撃時の選択重み補正.
+}
+
+enum TacticsHpRecoveryType {
+  TACTICS_HP_RECOVERY_INCAPACITATED_FULL = 0; // HP0のキャラクターだけを対象とし, 最大HPの100%まで回復する.
+  TACTICS_HP_RECOVERY_POSITIVE_HP_RATE = 1; // HP1以上のキャラクターだけを対象とし, マスターデータの割合だけ回復する.
+}
+
+enum TacticsBattleSpecialType {
+  TACTICS_BATTLE_SPECIAL_ACCELERATOR = 0; // アクセラレーター系.
+  TACTICS_BATTLE_SPECIAL_ASSAULT = 1; // アサルト系.
+  TACTICS_BATTLE_SPECIAL_ERASE = 2; // イレイス系.
+  TACTICS_BATTLE_SPECIAL_ACE = 3; // エース系.
+  TACTICS_BATTLE_SPECIAL_EXTERLIZE = 4; // エクスターライズ系.
+  TACTICS_BATTLE_SPECIAL_EX_DRIVE = 5; // エクスドライブ系.
+  TACTICS_BATTLE_SPECIAL_EDGE_NOTE = 6; // エッジノート系.
+  TACTICS_BATTLE_SPECIAL_ELYSION = 7; // エリュシオン系.
+  TACTICS_BATTLE_SPECIAL_ENDER_BREAK = 8; // エンダーブレイク系.
+  TACTICS_BATTLE_SPECIAL_ORACLE = 9; // オラクル系.
+  TACTICS_BATTLE_SPECIAL_ORATORIO = 10; // オラトリオ系.
+  TACTICS_BATTLE_SPECIAL_CURSE = 11; // カーズ系.
+  TACTICS_BATTLE_SPECIAL_COUNTER = 12; // カウンター系.
+  TACTICS_BATTLE_SPECIAL_CASTLE_WEAKNESS = 13; // キャッスルウィークネス系.
+  TACTICS_BATTLE_SPECIAL_CASTLE_VEIL = 14; // キャッスルヴェール系.
+  TACTICS_BATTLE_SPECIAL_CLAUSTRUM = 15; // クラウストルム系.
+  TACTICS_BATTLE_SPECIAL_GRAVITY_ASSAULT = 16; // グラビティアサルト系.
+  TACTICS_BATTLE_SPECIAL_CLEVER_NOTE = 17; // クレバーノート系.
+  TACTICS_BATTLE_SPECIAL_JUGGERNAUT = 18; // ジャガーノート系.
+  TACTICS_BATTLE_SPECIAL_SHADOW = 19; // シャドウ系.
+  TACTICS_BATTLE_SPECIAL_STEALTH = 20; // ステルス系.
+  TACTICS_BATTLE_SPECIAL_STREAM = 21; // ストリーム系.
+  TACTICS_BATTLE_SPECIAL_SLASHER = 22; // スラッシャー系.
+  TACTICS_BATTLE_SPECIAL_SLOW_RATE = 23; // スロウレート系.
+  TACTICS_BATTLE_SPECIAL_TARANTELLA = 24; // タランテラ系.
+  TACTICS_BATTLE_SPECIAL_DIVINE_ACTIVE = 25; // ディバインアクティブ系.
+  TACTICS_BATTLE_SPECIAL_DIVINE_ETOILE = 26; // ディバインエトワール系.
+  TACTICS_BATTLE_SPECIAL_DIVINE_THRUST = 27; // ディバインスラスト系.
+  TACTICS_BATTLE_SPECIAL_DIVINE_RAPID = 28; // ディバインラピッド系.
+  TACTICS_BATTLE_SPECIAL_BERSERK = 29; // バーサク系.
+  TACTICS_BATTLE_SPECIAL_HIDE = 30; // ハイド系.
+  TACTICS_BATTLE_SPECIAL_PANZER = 31; // パンツァー系.
+  TACTICS_BATTLE_SPECIAL_HEAL = 32; // ヒール系.
+  TACTICS_BATTLE_SPECIAL_PHALANX = 33; // ファランクス系.
+  TACTICS_BATTLE_SPECIAL_FORCE_OF_WISH = 34; // フォースオブウィッシュ系.
+  TACTICS_BATTLE_SPECIAL_FORCE_OF_PLAY = 35; // フォースオブプレイ系.
+  TACTICS_BATTLE_SPECIAL_FORTRESS = 36; // フォートレスオーダー系.
+  TACTICS_BATTLE_SPECIAL_BLITZ = 37; // ブリッツ系.
+  TACTICS_BATTLE_SPECIAL_PROVOKE = 38; // プロヴォーク系.
+  TACTICS_BATTLE_SPECIAL_POINT_RISE = 39; // ポイントライズ系.
+  TACTICS_BATTLE_SPECIAL_MENACE = 40; // メナス系.
+  TACTICS_BATTLE_SPECIAL_RAMPAGE = 41; // ランページ系.
+  TACTICS_BATTLE_SPECIAL_REVIVE = 42; // リヴァイブ系.
+  TACTICS_BATTLE_SPECIAL_RECONTRACT = 43; // リコントラクト系.
+  TACTICS_BATTLE_SPECIAL_RESURRECTION = 44; // リザレクション系.
+  TACTICS_BATTLE_SPECIAL_RECT_NOTE = 45; // レクトノート系.
+  TACTICS_BATTLE_SPECIAL_WISE_NOTE = 46; // ワイズノート系.
+  TACTICS_BATTLE_SPECIAL_ASSAULT_ORDER = 47; // アサルトオーダー系.
+  TACTICS_BATTLE_SPECIAL_ACE_ORDER = 48; // エースオーダー系.
+  TACTICS_BATTLE_SPECIAL_SHADOW_ORDER = 49; // シャドウオーダー系.
+}
+
+enum TacticsBattleSpecialTrigger {
+  TACTICS_BATTLE_SPECIAL_TRIGGER_NONE = 0; // 追加の発動条件を持たない.
+  TACTICS_BATTLE_SPECIAL_TRIGGER_BATTLE = 1; // 戦闘時に発動する.
+  TACTICS_BATTLE_SPECIAL_TRIGGER_ENEMY_ANNIHILATED = 2; // 敵全滅時に発動する.
+  TACTICS_BATTLE_SPECIAL_TRIGGER_CASTLE_BREAK = 3; // キャッスルブレイク時に発動する.
+  TACTICS_BATTLE_SPECIAL_TRIGGER_ASSAULT_CASTLE_BREAK = 4; // 強襲キャッスルブレイク時に発動する.
+  TACTICS_BATTLE_SPECIAL_TRIGGER_INTERCEPTION = 5; // 迎撃（被弾）時に発動する.
+}
+
+enum FormationConditionID {
+  FORMATION_CONDITION_NONE = 0; // 属性条件なし.
+  FORMATION_CONDITION_SLASH_ONLY = 1; // 斬属性キャラクターのみ条件一致.
+  FORMATION_CONDITION_PIERCE_ONLY = 2; // 突属性キャラクターのみ条件一致.
+  FORMATION_CONDITION_STRIKE_ONLY = 3; // 打属性キャラクターのみ条件一致.
+  FORMATION_CONDITION_RANGED_ONLY = 4; // 遠属性キャラクターのみ条件一致.
+}
+
+enum AbilityTarget {
+  ABILITY_TARGET_NONE = 0; // 効果対象をAbilityMasterDataでは固定せず, 戦闘フローで決定する.
+  ABILITY_TARGET_SELF = 1; // 発動キャラクター自身.
+  ABILITY_TARGET_ALLY_SINGLE = 2; // 味方単体.
+  ABILITY_TARGET_ALLY_ALL = 3; // 味方全体.
+  ABILITY_TARGET_ENEMY_SINGLE = 4; // 敵単体.
+  ABILITY_TARGET_ENEMY_ALL = 5; // 敵全体.
+}
+
+enum AbilityConditionID {
+  ABILITY_CONDITION_BATTLE_START = 0; // 戦闘開始時に条件成立.
+  ABILITY_CONDITION_INCAPACITATED = 1; // 戦闘不能時に条件成立.
+  ABILITY_CONDITION_NORMAL_ATTACK = 2; // 通常攻撃時に条件成立.
+  ABILITY_CONDITION_EVERY_N_TURNS = 3; // 指定ターン間隔ごとに条件成立.
+  ABILITY_CONDITION_ATTACKED = 4; // 被攻撃時に条件成立.
+  ABILITY_CONDITION_HP_AT_OR_BELOW_THRESHOLD = 5; // 自身が指定HP閾値以下で条件成立.
+  ABILITY_CONDITION_CASTLE_BREAK = 6; // キャッスルブレイク時に条件成立.
+  ABILITY_CONDITION_HP_FULL_NORMAL_ATTACK = 7; // 自身が最大HPかつ通常攻撃時に条件成立.
+  ABILITY_CONDITION_SINGLE_TARGET_NORMAL_ATTACK = 8; // 通常攻撃の最終攻撃対象が1体の場合に条件成立.
+  ABILITY_CONDITION_SKILL_ATTACK = 9; // 攻撃スキル発動時に条件成立.
+  ABILITY_CONDITION_ALLY_ATTACK = 10; // 自分以外の味方キャラクターの通常攻撃成立時に条件成立.
+  ABILITY_CONDITION_ALLY_HP_AT_OR_BELOW_THRESHOLD_ATTACKED = 11; // 攻撃対象リストに指定HP閾値以下の味方が含まれる場合に条件成立.
+  ABILITY_CONDITION_ENEMY_NORMAL_ATTACK_TARGETING = 12; // 敵の通常攻撃で攻撃対象リストを取得する直前に条件成立.
+  ABILITY_CONDITION_LETHAL_DAMAGE = 13; // ダメージ反映後HPが0以下になる直前に条件成立.
+  ABILITY_CONDITION_STATUS_ABNORMALITY_APPLICATION = 14; // 状態異常付与判定を受ける直前に条件成立.
+  ABILITY_CONDITION_TARGET_HP_AT_OR_BELOW_THRESHOLD_NORMAL_ATTACK = 15; // 指定HP閾値以下の敵が存在する通常攻撃時に条件成立.
+}
+
+enum AbilityTurnTiming {
+  ABILITY_TURN_TIMING_TURN_START = 0; // ターン開始直後に評価する.
+  ABILITY_TURN_TIMING_BEFORE_ACTION = 1; // 行動キャラクターの行動直前に評価する.
+  ABILITY_TURN_TIMING_AFTER_ACTION = 2; // 行動キャラクターの行動完了直後に評価する.
+  ABILITY_TURN_TIMING_TURN_END = 3; // 状態異常更新・ターン終了時効果処理後, ターン終了直前に評価する.
+}
+
+enum TacticsTarget {
+  TACTICS_TARGET_SELF_PARTY = 0; // 使用プレイヤー自身のパーティを対象とする.
+  TACTICS_TARGET_OPPONENT_PARTY = 1; // 出撃後に戦闘へ入った時点の対戦相手パーティを対象とする. 使用時点で特定Playerへ固定しない.
+  TACTICS_TARGET_ALLY_GUILD = 2; // 味方騎士団を対象とする.
+  TACTICS_TARGET_ENEMY_GUILD = 3; // 敵騎士団を対象とする.
+  TACTICS_TARGET_CASTLE_BREAK = 4; // キャッスルブレイク処理を対象とする.
+}
+
+enum TacticsUseCondition {
+  TACTICS_USE_CONDITION_NONE = 0; // 追加の使用条件なし.
+  TACTICS_USE_CONDITION_ALL_ANNIHILATED = 1; // 使用プレイヤーのパーティが全滅している場合だけ使用可能.
+}
+
+enum TacticsEndType {
+  TACTICS_END_TYPE_DURATION = 0; // 指定時間の経過で終了する.
+  TACTICS_END_TYPE_COUNT = 1; // 指定イベントの発生回数を消費し終えると終了する.
+  TACTICS_END_TYPE_ON_ACTIVATION = 2; // 発動時の1回のみ適用して終了する.
+}
+
+enum TacticsCountConsumeTrigger {
+  TACTICS_COUNT_CONSUME_TRIGGER_CASTLE_BREAK = 0; // キャッスルブレイク発生時に1回消費する.
+  TACTICS_COUNT_CONSUME_TRIGGER_ANNIHILATION = 1; // 殲滅発生時に1回消費する.
+  TACTICS_COUNT_CONSUME_TRIGGER_ANNIHILATION_ALL_ENEMIES = 2; // 殲滅で相手を全滅させた場合に1回消費する.
+  TACTICS_COUNT_CONSUME_TRIGGER_SORTIE = 3; // 出撃時に1回消費する.
+}
+
+enum GuildBattleStartTime {
+  GUILD_BATTLE_START_1130 = 0; // 昼時間帯11:30開始.
+  GUILD_BATTLE_START_1215 = 1; // 昼時間帯12:15開始.
+  GUILD_BATTLE_START_1300 = 2; // 昼時間帯13:00開始.
+  GUILD_BATTLE_START_2100 = 3; // 夜時間帯21:00開始.
+  GUILD_BATTLE_START_2200 = 4; // 夜時間帯22:00開始.
+  GUILD_BATTLE_START_2300 = 5; // 夜時間帯23:00開始.
+}
+
+enum ApiErrorCode {
+  API_ERROR_UNSPECIFIED = 0; // 未分類のAPIエラー.
+  API_ERROR_INVALID_ACCESS_TOKEN = 2; // AccessTokenが不正.
+  API_ERROR_INVALID_USER_NAME = 3; // UserNameが不正.
+  API_ERROR_INVALID_PLAYER_ID = 4; // PlayerIDが不正.
+  API_ERROR_NO_OPPONENT_AVAILABLE = 6; // 対戦可能な相手が存在しない.
+  API_ERROR_GUILD_BATTLE_JOIN_NOT_ALLOWED = 7; // 騎士団戦への参加条件を満たさない.
+  API_ERROR_GUILD_BATTLE_PARTY_UPDATE_NOT_ALLOWED = 8; // 騎士団戦編成を変更できない.
+  API_ERROR_GUILD_BATTLE_SORTIE_NOT_ALLOWED = 9; // 出撃条件を満たさない.
+  API_ERROR_TACTICS_NOT_AVAILABLE = 10; // タクティクスを使用できない.
+  API_ERROR_ITEM_NOT_AVAILABLE = 11; // アイテムを使用できない.
+  API_ERROR_HEAL_NOT_AVAILABLE = 12; // 治療を開始できない.
+  API_ERROR_HEAL_CANCEL_NOT_ALLOWED = 13; // 治療をキャンセルできない.
+  API_ERROR_HEAL_COMPLETE_NOT_ALLOWED = 14; // 治療を完了できない.
+  API_ERROR_REVIVE_NOT_AVAILABLE = 15; // 復活を開始できない.
+  API_ERROR_REVIVE_CANCEL_NOT_ALLOWED = 16; // 復活をキャンセルできない.
+  API_ERROR_REVIVE_COMPLETE_NOT_ALLOWED = 17; // 復活を完了できない.
+  API_ERROR_INVALID_GUILD_BATTLE_SEQUENCE = 18; // 騎士団戦RequestSequenceが不正.
+  API_ERROR_GUILD_FULL = 19; // 騎士団の所属上限に到達している.
+  API_ERROR_GUILD_MEMBERSHIP_CHANGE_NOT_ALLOWED = 20; // 騎士団加入・脱退が禁止されている.
+  API_ERROR_INVALID_PARTY = 21; // 編成制約を満たしていない.
+  API_ERROR_RATE_LIMIT_EXCEEDED = 22; // PublicAPIのレート制限を超過した.
+  API_ERROR_INVALID_GUILD_NAME = 23; // GuildNameがUTF-8・最大10文字・空文字不可の制約を満たさない.
+  API_ERROR_CLIENT_VERSION_MISMATCH = 24; // ClientVersionがGameServerの要求Versionと一致しない.
+  API_ERROR_GUILD_LEADERSHIP_CHANGE_NOT_ALLOWED = 25; // 団長以外が団長・副団長変更を要求した.
+  API_ERROR_INVALID_CREDENTIALS = 26; // LoginID不存在またはPassword不一致.
+  API_ERROR_INVALID_LOGIN_ID = 27; // LoginIDが不正.
+  API_ERROR_INVALID_PASSWORD = 28; // Passwordが不正.
+  API_ERROR_INVALID_REFRESH_TOKEN = 30; // RefreshTokenが不正または期限切れ.
+  API_ERROR_GAME_SERVER_UNAVAILABLE = 31; // 対象騎士団戦を所有するGameServerへ到達できない.
+  API_ERROR_DISCORD_AUTHORIZATION_REQUIRED = 32; // 現在の構成でDiscord追加認可が必須だがDiscordAuthorizationTokenが指定されていない.
+  API_ERROR_INVALID_DISCORD_AUTHORIZATION_TOKEN = 33; // DiscordAuthorizationTokenが不正または期限切れ.
+  API_ERROR_GUILD_JOIN_APPLICATION_NOT_FOUND = 34; // 指定された未承認加入申請が存在しない.
+  API_ERROR_GUILD_JOIN_APPROVAL_NOT_ALLOWED = 35; // 加入申請の承認権限を持たないPlayerが承認を要求した.
+  API_ERROR_GUILD_INVITATION_NOT_ALLOWED = 36; // 団長・副団長以外が招待を送信した.
+  API_ERROR_GUILD_INVITATION_NOT_FOUND = 37; // 指定Player向けの未承諾招待が存在しない.
+  API_ERROR_INVALID_GUILD_LEADERSHIP_TARGET = 38; // 団長・副団長候補が対象Guild所属ではない, または団長と副団長が同一PlayerIDである.
+  API_ERROR_GUILD_LEADER_MOVE_NOT_ALLOWED = 39; // 団長以外のメンバーが存在する騎士団の団長が加入申請または招待によって別Guildへ移動しようとした.
+  API_ERROR_ACCOUNT_CREATION_FAILED = 40; // Accountを作成できなかった. LoginID重複を含むDatabase上のAccount作成失敗理由はClientへ区別して返さない.
+  API_ERROR_REQUIRED_OPERATION_FAILED = 41; // 必須の後続処理を完了できなかった.
+  API_ERROR_TAVERN_RECOVERY_NOT_AVAILABLE = 42; // 酒場の利用が許可されない.
+  API_ERROR_GUILD_FACILITY_MAX_LEVEL = 43; // 施設が最大Lvに到達済み.
+  API_ERROR_INSUFFICIENT_GOLD = 44; // 指定額またはPlayer保有ゴールドが足りない.
+}
+
+enum Rarity {
+  RARITY_N = 0; // Nレアリティ.
+  RARITY_R = 1; // Rレアリティ.
+  RARITY_SR = 2; // SRレアリティ.
+  RARITY_SSR = 3; // SSRレアリティ.
+  RARITY_UR = 4; // URレアリティ.
+}
+
+enum CharacterAttribute {
+  CHARACTER_ATTRIBUTE_SLASH = 0; // 斬属性.
+  CHARACTER_ATTRIBUTE_PIERCE = 1; // 突属性.
+  CHARACTER_ATTRIBUTE_STRIKE = 2; // 打属性.
+  CHARACTER_ATTRIBUTE_RANGED = 3; // 遠属性.
+}
+
+enum SpeedRank {
+  SPEED_RANK_SS9 = 0; // 速度ランクSS9.
+  SPEED_RANK_SS8 = 1; // 速度ランクSS8.
+  SPEED_RANK_SS7 = 2; // 速度ランクSS7.
+  SPEED_RANK_SS6 = 3; // 速度ランクSS6.
+  SPEED_RANK_SS5 = 4; // 速度ランクSS5.
+  SPEED_RANK_SS4 = 5; // 速度ランクSS4.
+  SPEED_RANK_SS3 = 6; // 速度ランクSS3.
+  SPEED_RANK_SS2 = 7; // 速度ランクSS2.
+  SPEED_RANK_SS1 = 8; // 速度ランクSS1.
+  SPEED_RANK_SS_PLUS = 9; // 速度ランクSS+.
+  SPEED_RANK_SS = 10; // 速度ランクSS.
+  SPEED_RANK_SS_MINUS = 11; // 速度ランクSS-.
+  SPEED_RANK_S_PLUS = 12; // 速度ランクS+.
+  SPEED_RANK_S = 13; // 速度ランクS.
+  SPEED_RANK_S_MINUS = 14; // 速度ランクS-.
+  SPEED_RANK_A_PLUS = 15; // 速度ランクA+.
+  SPEED_RANK_A = 16; // 速度ランクA.
+  SPEED_RANK_A_MINUS = 17; // 速度ランクA-.
+  SPEED_RANK_B_PLUS = 18; // 速度ランクB+.
+  SPEED_RANK_B = 19; // 速度ランクB.
+  SPEED_RANK_B_MINUS = 20; // 速度ランクB-.
+  SPEED_RANK_C_PLUS = 21; // 速度ランクC+.
+  SPEED_RANK_C = 22; // 速度ランクC.
+  SPEED_RANK_C_MINUS = 23; // 速度ランクC-.
+  SPEED_RANK_D_PLUS = 24; // 速度ランクD+.
+  SPEED_RANK_D = 25; // 速度ランクD.
+  SPEED_RANK_D_MINUS = 26; // 速度ランクD-.
+  SPEED_RANK_E_PLUS = 27; // 速度ランクE+.
+  SPEED_RANK_E = 28; // 速度ランクE.
+  SPEED_RANK_E_MINUS = 29; // 速度ランクE-.
+  SPEED_RANK_F_PLUS = 30; // 速度ランクF+.
+  SPEED_RANK_F = 31; // 速度ランクF.
+  SPEED_RANK_F_MINUS = 32; // 速度ランクF-.
+}
+
+enum BuffDebuffState {
+  BUFF_DEBUFF_STATE_NONE = 0; // バフもデバフも付与されていない.
+  BUFF_DEBUFF_STATE_BUFF = 1; // バフだけが付与されている.
+  BUFF_DEBUFF_STATE_DEBUFF = 2; // デバフだけが付与されている.
+  BUFF_DEBUFF_STATE_BUFF_DEBUFF = 3; // バフとデバフの両方が付与されている.
+}
+
+enum PartyRank {
+  PARTY_RANK_SS9 = 0; // パーティランクSS9.
+  PARTY_RANK_SS8 = 1; // パーティランクSS8.
+  PARTY_RANK_SS7 = 2; // パーティランクSS7.
+  PARTY_RANK_SS6 = 3; // パーティランクSS6.
+  PARTY_RANK_SS5 = 4; // パーティランクSS5.
+  PARTY_RANK_SS4 = 5; // パーティランクSS4.
+  PARTY_RANK_SS3 = 6; // パーティランクSS3.
+  PARTY_RANK_SS2 = 7; // パーティランクSS2.
+  PARTY_RANK_SS1 = 8; // パーティランクSS1.
+  PARTY_RANK_SS_PLUS = 9; // パーティランクSS+.
+  PARTY_RANK_SS = 10; // パーティランクSS.
+  PARTY_RANK_SS_MINUS = 11; // パーティランクSS-.
+  PARTY_RANK_S_PLUS = 12; // パーティランクS+.
+  PARTY_RANK_S = 13; // パーティランクS.
+  PARTY_RANK_S_MINUS = 14; // パーティランクS-.
+  PARTY_RANK_A_PLUS = 15; // パーティランクA+.
+  PARTY_RANK_A = 16; // パーティランクA.
+  PARTY_RANK_A_MINUS = 17; // パーティランクA-.
+  PARTY_RANK_B_PLUS = 18; // パーティランクB+.
+  PARTY_RANK_B = 19; // パーティランクB.
+  PARTY_RANK_B_MINUS = 20; // パーティランクB-.
+  PARTY_RANK_C_PLUS = 21; // パーティランクC+.
+  PARTY_RANK_C = 22; // パーティランクC.
+  PARTY_RANK_C_MINUS = 23; // パーティランクC-.
+  PARTY_RANK_D_PLUS = 24; // パーティランクD+.
+  PARTY_RANK_D = 25; // パーティランクD.
+  PARTY_RANK_D_MINUS = 26; // パーティランクD-.
+  PARTY_RANK_E_PLUS = 27; // パーティランクE+.
+  PARTY_RANK_E = 28; // パーティランクE.
+  PARTY_RANK_E_MINUS = 29; // パーティランクE-.
+  PARTY_RANK_F_PLUS = 30; // パーティランクF+.
+  PARTY_RANK_F = 31; // パーティランクF.
+  PARTY_RANK_F_MINUS = 32; // パーティランクF-.
+}
+
+message Player {
+  uint64 id = 1; // プレイヤーID. 論理型PlayerID.
+  string name = 2; // プレイヤー名. 論理型UserName.
+  uint64 guild_id = 3; // 現在所属している騎士団ID. 論理型GuildID.
+}
+
+message PartyCharacterStatus {
+  uint32 id = 1; // キャラクターID. 論理型CharacterID.
+  float max_hp = 2; // 従者補正適用後の編成時最大HP. 現在HPは保持しない. 論理型Float32.
+  float attack = 3; // 従者補正適用後の編成時攻撃力. 論理型Float32.
+  float defense = 4; // 従者補正適用後の編成時防御力. 論理型Float32.
+  SpeedRank speed = 5; // 編成時の速度ランク. Enum数値を速度レベルとして平均計算に使用する. 従者による速度補正は存在しない.
+}
+
+message BuffDebuffEffectState {
+  float attack_buff = 1; // スキル・アビリティによる攻撃バフ補正値の合計. 論理型CorrectionValue.
+  float attack_debuff = 2; // スキル・アビリティによる攻撃デバフ補正値の合計. 論理型CorrectionValue.
+  float defense_buff = 3; // スキル・アビリティによる防御バフ補正値の合計. 論理型CorrectionValue.
+  float defense_debuff = 4; // スキル・アビリティによる防御デバフ補正値の合計. 論理型CorrectionValue.
+}
+
+message StatusAbnormalityState {
+  StatusAbnormalityID status_id = 1; // 現在付与されている状態異常ID.
+  uint32 elapsed_turns = 2; // 状態異常付与ターンを1として数える経過ターン数. 同一状態異常の再付与時は1へ戻す.
+  uint32 poison_cycle_turns = 3; // 毒ダメージの3ターン周期を管理する経過カウント. 毒以外では0. 毒再付与時はリセットしない.
+}
+
+message SkillBattleState {
+  uint32 skill_id = 1; // この状態が管理するSkillID（通常SkillまたはUF）。論理型SkillID。
+  uint32 activation_count = 2; // 当該戦闘中にこのSkillIDが発動した累計回数. 論理型Count.
+}
+
+message AbilityBattleState {
+  uint32 ability_id = 1; // Abilityスロットに設定されたアビリティID. 論理型AbilityID.
+  uint32 activation_count = 2; // 当該戦闘中にこのAbilityIDが発動した累計回数. 論理型Count.
+  bool activated_this_turn = 3; // 現在ターン内でこのAbilityIDがすでに発動済みの場合true. ターン開始時にfalseへ戻す.
+}
+
+// Skill由来の反撃・挑発・追撃および次回攻撃補正は一時状態として保持する。
+message SkillNextAttackDamageState {
+  uint32 source_skill_id = 1;
+  float damage_multiplier = 2;
+}
+
+message SkillTemporaryEffectState {
+  uint32 source_skill_id = 1;
+  AbilityEffectID ability_effect_id = 2;
+  uint32 remaining_turns = 3; // 発動ターンを第1ターンとし10ターン目終了で失効。有効な間、同じAbilityEffectIDの再付与では変更しない。
+}
+
+message CharacterBattle {
+  uint32 id = 1; // キャラクターID. 論理型CharacterID.
+  CharacterAttribute attribute = 2; // キャラクター属性.
+  HitPoints hp = 3; // 戦闘中の最大HPと現在HP.
+  float attack = 4; // 従者等の補正適用後の戦闘計算用攻撃力. 論理型Float32.
+  float defense = 5; // 従者等の補正適用後の戦闘計算用防御力. 論理型Float32.
+  SpeedRank speed = 6; // 戦闘で使用する速度ランク.
+  uint32 bp = 7; // キャラクターBP.wire上はuint32, 論理型BP.
+  SkillBattleState skill_state = 8; // 戦闘中のメインスキルIDと累計発動回数.
+  repeated uint32 tactics_ids = 9; // 戦闘で使用可能なタクティクスID一覧. 各要素は論理型TacticsID.
+  repeated AbilityBattleState ability_states = 10; // Abilityスロット順の戦闘中アビリティ状態一覧. AbilityIDごとに累計発動回数とターン内発動済み状態を保持する.
+  uint64 owner_player_id = 11; // このキャラクターを編成しているプレイヤーID. 同順位抽選の初期順序決定に使用する. 論理型PlayerID.
+  BuffDebuffState buff_debuff_state = 12; // スキル・アビリティによる現在のバフ・デバフ付与状態.
+  BuffDebuffEffectState buff_debuff_effect = 13; // スキル・アビリティによる現在の攻撃・防御バフ/デバフ実値.
+  repeated StatusAbnormalityState status_abnormalities = 14; // 現在付与されている状態異常の実行時状態一覧. 複数状態異常を同時に保持できる.
+  repeated SkillTemporaryEffectState skill_temporary_effects = 15; // Skillから付与された一時効果。Quest Wave間で継続。
+  repeated SkillNextAttackDamageState skill_next_attack_damage = 16; // 次回攻撃時に消費する補正。Quest Wave間で継続。
+  SkillBattleState uf_skill_state = 17; // UF所持者だけ存在する追加状態。通常skill_stateと発動回数を分離。メッセージ未設定はUFなし。
+}
+
+message HitPoints {
+  float max_hp = 1; // 戦闘計算用最大HP. 論理型Float32.
+  float current_hp = 2; // 戦闘計算用現在HP. 論理型Float32.
+}
+
+message TacticsBattleState {
+  uint32 available_uses = 1; // 騎士団戦中に残っているタクティクス使用可能回数. 論理型Count.
+  uint32 tp_cost = 2; // タクティクス使用時に消費するTP.wire上はuint32, 論理型TP.
+}
+
+message GuildBattlePlayerRuntimeState {
+  uint32 attack_count = 1; // 当該騎士団戦で出撃に成功した累計回数. 初期値0. 論理型Count.
+  float acquired_score = 2; // 当該騎士団戦で当該Playerが個別に取得した累計スコア. 初期値0. 論理型SortieScore. 小数を保持する.
+}
+
+message TacticsBattleSpecialParameters {
+  float attack = 1; // 攻撃力補正値. 論理型CorrectionValue.
+  float defense = 2; // 防御力補正値. 論理型CorrectionValue.
+  float speed = 3; // 速度補正値. 論理型CorrectionValue.
+  float skill_activation_rate = 4; // スキル発動率補正値. 論理型CorrectionValue.
+  float max_tp = 5; // 最大TP補正値. 論理型CorrectionValue.
+  float battle_score = 6; // バトルで獲得する騎士団戦スコア補正値. 論理型CorrectionValue.
+  float guild_battle_score = 7; // 騎士団戦で獲得するスコア全般の補正値. 論理型CorrectionValue.
+  float castle_break_score = 8; // キャッスルブレイク獲得スコア補正値. 論理型CorrectionValue.
+  float assault_castle_break_rate = 9; // 強襲CB発生率補正値. 論理型CorrectionValue.
+  float assault_castle_break_score = 10; // 強襲CB時獲得スコア補正値. 論理型CorrectionValue.
+  float hate = 11; // 被弾重みへ加算するヘイト補正値. CLAUSTRUMで使用する. 論理型CorrectionValue.
+  sint32 castle_level = 12; // 城Lv補正値. 正値は上昇, 負値は低下.
+  uint32 bp_recovery = 13; // 敵全滅等の発動条件成立時に回復するBP固定値.
+  uint32 tp_recovery = 14; // 発動条件成立時に回復するTP固定値.
+  float attack_count_score = 15; // 攻撃回数に応じたバトル獲得スコア増加に使用する補正値. 論理型CorrectionValue.
+  float castle_break_score_limit = 16; // キリ番キャッスルブレイクのスコア上限増加値. 論理型CorrectionValue.
+  float hp_recovery_value = 17; // 生存キャラクターHP回復量. 値をそのまま加算し, 最終HPを0以上最大HP以下へクランプする. 論理型CorrectionValue.
+  float revive_rate = 18; // 戦闘不能キャラクター復帰判定で使用する発動確率. 論理型Rate.
+  float attack_target_rate = 19; // 攻撃対象として選択される確率への補正値. HIDE / PROVOKEで使用する. 論理型CorrectionValue.
+}
+
+message TacticsBattleSpecialData {
+  TacticsBattleSpecialType special_type = 1; // 特殊効果系列.
+  TacticsBattleSpecialParameters parameters = 2; // special_typeの具体効果で使用する各数値パラメータ.
+  TacticsBattleSpecialTrigger trigger = 3; // 効果を発動する条件.
+}
+
+message TacticsHpRecoveryData {
+  TacticsHpRecoveryType recovery_type = 1; // HP回復方式.
+  float recovery_rate = 2; // HP1以上回復方式で対象最大HPへ乗算する割合. HP0全回復方式では1.0として扱う. 論理型Rate.
+}
+
+message TacticsActiveEffectState {
+  uint32 tactics_id = 1; // この継続効果を生成したタクティクスID. 論理型TacticsID. 同一タクティクス再使用判定に使用する.
+  TacticsEffectID effect_id = 2; // 継続中の効果種別.
+  TacticsTarget target = 3; // 継続中の効果対象. OPPONENT_PARTYは出撃ごとにその時点の対戦相手パーティへ再Bindする.
+  float effect_value = 4; // スカラー値で表現する効果の現在値. 論理型CorrectionValue.
+  uint64 expires_at = 5; // DURATION型の絶対終了時刻. UNIX epochからの経過マイクロ秒. 論理型GameServerTime. DURATION以外では0.
+  uint32 remaining_count = 6; // 残り効果回数. 論理型Count.
+  TacticsBattleSpecialData battle_special = 7; // effect_idがBATTLE_SPECIALの場合に保持する特殊効果データ.
+  TacticsCountConsumeTrigger count_consume_trigger = 8; // COUNT型効果の残り回数を消費するイベント. COUNT以外では参照しない.
+  TacticsEndType end_type = 9; // 継続中効果の終了方式.
+  bool erase_consumed = 10; // ERASEが最初の通常攻撃ダメージを0にする効果をすでに消費した場合true. ERASE以外ではfalse.
+  uint64 source_player_id = 11; // この効果を発動したPlayerID.
+  uint64 source_guild_id = 12; // この効果を発動したPlayerが使用時点で所属するGuildID.
+}
+
+enum TacticsCategory {
+  TACTICS_CATEGORY_BUFF = 0; // バフ分類.
+  TACTICS_CATEGORY_DEBUFF = 1; // デバフ分類.
+  TACTICS_CATEGORY_SCORE_UP = 2; // スコアアップ分類.
+  TACTICS_CATEGORY_HEAL = 3; // 回復分類.
+  TACTICS_CATEGORY_SPECIAL = 4; // 特殊分類.
+}
+
+enum ItemType {
+  ITEM_TYPE_BP_50_RECOVERY = 0; // BPを50回復するアイテム.
+  ITEM_TYPE_BP_FULL_RECOVERY = 1; // BPを最大まで回復するアイテム.
+}
+
+enum GuildBattleSortieEventType {
+  GUILD_BATTLE_SORTIE_EVENT_ANNIHILATION = 0; // 殲滅.
+  GUILD_BATTLE_SORTIE_EVENT_NUMBERED_CASTLE_BREAK = 1; // キリ番CB.
+  GUILD_BATTLE_SORTIE_EVENT_ASSAULT_CASTLE_BREAK = 2; // 強襲CB.
+  GUILD_BATTLE_SORTIE_EVENT_CBC = 3; // キャッスルブレイクチャンスによるCB.
+}
+
+enum GuildBattleStatus {
+  GUILD_BATTLE_STATUS_SCHEDULED = 0; // 開戦予定.
+  GUILD_BATTLE_STATUS_IN_PROGRESS = 1; // 開戦中かつ新規処理受付中.
+  GUILD_BATTLE_STATUS_RESOLVING = 2; // 30:00到達後, 新規受付停止済みで既存キュー解決中.
+  GUILD_BATTLE_STATUS_COMPLETED = 3; // 騎士団戦終了.
+  GUILD_BATTLE_STATUS_PRELOAD_FAILED = 4; // 開戦前Preload失敗により運営判断待ち.
+  GUILD_BATTLE_STATUS_CANCELED = 5; // 運営判断で取りやめた終端状態.
+  GUILD_BATTLE_STATUS_REPLACED = 6; // 同一ペア再開で新IDの対戦に置換された旧レコードの終端状態.
+}
+
+enum GuildBattleResult {
+  GUILD_BATTLE_RESULT_WIN = 0; // 勝利.
+  GUILD_BATTLE_RESULT_LOSE = 1; // 敗北.
+  GUILD_BATTLE_RESULT_DRAW = 2; // 引き分け.
+}
+
+enum HealState {
+  HEAL_STATE_NONE = 0; // 治療状態ではない.
+  HEAL_STATE_HEALING = 1; // 治療中.
+  HEAL_STATE_COMPLETED = 2; // 治療完了待ち.
+}
+
+enum ReviveState {
+  REVIVE_STATE_ANNIHILATED = 0; // 全滅状態.
+  REVIVE_STATE_REVIVING = 1; // 復活処理中.
+  REVIVE_STATE_COMPLETED = 2; // 復活完了待ち.
+  REVIVE_STATE_NORMAL = 3; // 通常状態.
+}
