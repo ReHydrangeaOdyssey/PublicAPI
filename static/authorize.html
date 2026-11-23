@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ログイン</title>
+<main><h1>ログイン</h1>
+<form id="login">
+<label>ログインID <input name="login_id" autocomplete="username" required minlength="3" maxlength="64"></label><br>
+<label>パスワード <input name="password" type="password" autocomplete="current-password" required minlength="15" maxlength="128"></label><br>
+<label>追加認可 <select name="provider" required></select></label><br>
+<label>Discord認可Token <input name="discord_token" type="password" autocomplete="off"></label><br>
+<label>新規登録時の表示名 <input name="user_name" maxlength="20"></label><br>
+<button type="submit">ログイン</button><button type="button" id="create">新規登録</button>
+<button type="button" id="resume">ログイン状態を確認</button><button type="button" id="logout">ログアウト</button>
+</form><p id="status" role="status"></p></main>
+<script src="/auth/authorize.js" defer></script></html>
