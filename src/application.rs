@@ -55,10 +55,7 @@ async fn boundary(
     }) {
         return Failure::FORBIDDEN.into_response();
     }
-    let mut response = next.run(request).await;
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    let mut response = rpc::normalize_response(next.run(request).await);
     if valid_origin {
         if let Some(origin) = origin {
             response
